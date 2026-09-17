@@ -1,6 +1,7 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import { LocalAIClient } from './localai-client.js';
+import { verifyJwt } from './jwt-verifier.js';
 import { chatCompletionSchema, deleteModelParamsSchema } from './schemas.js';
 
 const LOCALAI_BASE_URL = process.env.LOCALAI_BASE_URL || 'https://localai.tail6518ad.ts.net';
@@ -16,8 +17,33 @@ const client = new LocalAIClient({
   timeoutMs: LOCALAI_TIMEOUT_MS,
 });
 
-// Proxy endpoint: GET /api/localai/models
-app.get('/api/localai/models', async (request, reply) => {
+// JWT auth preHandler
+const authMiddleware = async (request: any, reply: any) => {
+  const authorization = request.headers.authorization;
+  const result = verifyJwt(authorization);
+
+  if (!result.ok) {
+    const status = 401;
+    const body = {
+      error: 'Unauthorized',
+      code: result.type,
+    };
+    // Log only the error code, never the token or secret
+    request.log.warn({ code: result.type }, 'JWT verification failed');
+    return reply.status(status).send(body);
+  }
+
+  // Attach verified payload to request
+  request.jwtPayload = result.payload;
+};
+
+// Health check - public
+app.get('/api/health', async (request, reply) => {
+  reply.send({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Proxy endpoint: GET /api/localai/models - protected
+app.get('/api/localai/models', { preHandler: authMiddleware }, async (request, reply) => {
   const result = await client.request('/v1/models');
 
   if (!result.ok) {
@@ -31,8 +57,8 @@ app.get('/api/localai/models', async (request, reply) => {
   reply.send(result.data);
 });
 
-// Proxy endpoint: POST /api/localai/chat
-app.post('/api/localai/chat', { schema: { body: chatCompletionSchema } }, async (request, reply) => {
+// Proxy endpoint: POST /api/localai/chat - protected
+app.post('/api/localai/chat', { schema: { body: chatCompletionSchema }, preHandler: authMiddleware }, async (request, reply) => {
   const body = request.body as { model: string; messages: Array<{ role: string; content: string }> };
 
   const result = await client.request('/v1/chat/completions', {
@@ -54,8 +80,8 @@ app.post('/api/localai/chat', { schema: { body: chatCompletionSchema } }, async 
   reply.send(result.data);
 });
 
-// Proxy endpoint: DELETE /api/localai/models/:id
-app.delete('/api/localai/models/:id', { schema: { params: deleteModelParamsSchema } }, async (request, reply) => {
+// Proxy endpoint: DELETE /api/localai/models/:id - protected
+app.delete('/api/localai/models/:id', { schema: { params: deleteModelParamsSchema }, preHandler: authMiddleware }, async (request, reply) => {
   const modelId = (request.params as { id: string }).id;
 
   const result = await client.request(`/v1/models/${modelId}`, {
@@ -71,11 +97,6 @@ app.delete('/api/localai/models/:id', { schema: { params: deleteModelParamsSchem
   }
 
   reply.send({ success: true });
-});
-
-// Health check
-app.get('/api/health', async (request, reply) => {
-  reply.send({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 const start = async () => {
