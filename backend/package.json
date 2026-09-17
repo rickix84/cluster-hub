@@ -8,8 +8,8 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@fastify/cors": "^7.0.0",
     "fastify": "^5.0.0",
-    "fastify-cors": "^6.1.0",
     "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {

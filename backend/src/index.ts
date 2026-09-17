@@ -1,11 +1,12 @@
 import Fastify from 'fastify';
-import cors from 'fastify-cors';
+import cors from '@fastify/cors';
 
 const LOCALAI_BASE_URL = process.env.LOCALAI_BASE_URL || 'https://localai.tail6518ad.ts.net';
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 const app = Fastify({ logger: true });
 
-app.register(cors, { origin: true });
+app.register(cors, { origin: CORS_ORIGIN });
 
 // Proxy endpoint: GET /api/localai/models
 app.get('/api/localai/models', async (request, reply) => {
@@ -64,6 +65,7 @@ const start = async () => {
     await app.listen({ port: 3001, host: '0.0.0.0' });
     console.log(`Cluster Hub Backend listening on port 3001`);
     console.log(`LocalAI proxy: ${LOCALAI_BASE_URL}`);
+    console.log(`CORS origin: ${CORS_ORIGIN}`);
   } catch (err) {
     console.error(err);
     process.exit(1);
