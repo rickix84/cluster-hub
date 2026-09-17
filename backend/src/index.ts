@@ -1,6 +1,7 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import { LocalAIClient } from './localai-client.js';
+import { chatCompletionSchema, deleteModelParamsSchema } from './schemas.js';
 
 const LOCALAI_BASE_URL = process.env.LOCALAI_BASE_URL || 'https://localai.tail6518ad.ts.net';
 const LOCALAI_TIMEOUT_MS = parseInt(process.env.LOCALAI_TIMEOUT_MS || '30000', 10);
@@ -31,7 +32,7 @@ app.get('/api/localai/models', async (request, reply) => {
 });
 
 // Proxy endpoint: POST /api/localai/chat
-app.post('/api/localai/chat', async (request, reply) => {
+app.post('/api/localai/chat', { schema: { body: chatCompletionSchema } }, async (request, reply) => {
   const body = request.body as { model: string; messages: Array<{ role: string; content: string }> };
 
   const result = await client.request('/v1/chat/completions', {
@@ -54,7 +55,7 @@ app.post('/api/localai/chat', async (request, reply) => {
 });
 
 // Proxy endpoint: DELETE /api/localai/models/:id
-app.delete('/api/localai/models/:id', async (request, reply) => {
+app.delete('/api/localai/models/:id', { schema: { params: deleteModelParamsSchema } }, async (request, reply) => {
   const modelId = (request.params as { id: string }).id;
 
   const result = await client.request(`/v1/models/${modelId}`, {
