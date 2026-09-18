@@ -258,7 +258,8 @@ function TokenInput({
   const [showToken, setShowToken] = useState(false);
   const { token, setToken, clearToken, maskedToken } = useAuthStore();
 
-  const handleSetToken = () => {
+  const handleSetToken = (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
     const trimmed = tokenInput.trim();
     if (trimmed) {
       setToken(trimmed);
@@ -274,24 +275,26 @@ function TokenInput({
 
   if (!token) {
     return (
-      <div className="flex items-center gap-2">
+      <form onSubmit={handleSetToken} className="flex items-center gap-2">
         <Key className="h-4 w-4 text-muted-foreground" />
         <input
           type="password"
           value={tokenInput}
           onChange={(e) => setTokenInput(e.target.value)}
+          onPaste={(e) => setTokenInput(e.clipboardData.getData("text"))}
           placeholder="Inserisci token JWT…"
+          aria-label="Token JWT"
           className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/40 focus:border-primary w-48"
         />
         <button
-          onClick={handleSetToken}
+          type="submit"
           disabled={!tokenInput.trim()}
           className="h-8 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-1"
         >
           <LogIn className="h-3 w-3" />
           <span className="sr-only sm:not-sr-only">Autentica</span>
         </button>
-      </div>
+      </form>
     );
   }
 
@@ -347,6 +350,14 @@ export default function Home() {
     enabled: isAuthenticated,
     retry: false,
   });
+
+  const handleAuthChange = (authenticated: boolean) => {
+    setAuthError(null);
+    setIsAuthenticated(authenticated);
+    if (authenticated) {
+      window.setTimeout(() => void refetch(), 0);
+    }
+  };
 
   const deleteMutation = useMutation({
     mutationFn: deleteModel,
@@ -420,7 +431,7 @@ export default function Home() {
             <h1 className="text-base font-semibold tracking-tight">Cluster Hub</h1>
             <span className="text-xs text-muted-foreground hidden sm:inline">LocalAI POC</span>
           </div>
-          <TokenInput onAuthChange={setIsAuthenticated} />
+          <TokenInput onAuthChange={handleAuthChange} />
         </div>
         <button
           onClick={() => refetch()}
