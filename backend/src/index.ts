@@ -6,6 +6,7 @@ import { chatCompletionSchema, deleteModelParamsSchema } from './schemas.js';
 
 const LOCALAI_BASE_URL = process.env.LOCALAI_BASE_URL || 'https://localai.tail6518ad.ts.net';
 const LOCALAI_API_KEY = process.env.LOCALAI_API_KEY;
+const CLUSTER_HUB_STATIC_TOKEN = process.env.CLUSTER_HUB_STATIC_TOKEN;
 const LOCALAI_TIMEOUT_MS = parseInt(process.env.LOCALAI_TIMEOUT_MS || '30000', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
@@ -22,6 +23,15 @@ const client = new LocalAIClient({
 // JWT auth preHandler
 const authMiddleware = async (request: any, reply: any) => {
   const authorization = request.headers.authorization;
+  const staticAuthorization = CLUSTER_HUB_STATIC_TOKEN
+    ? `Bearer ${CLUSTER_HUB_STATIC_TOKEN}`
+    : undefined;
+
+  if (staticAuthorization && authorization === staticAuthorization) {
+    request.jwtPayload = { sub: 'static-poc-token' };
+    return;
+  }
+
   const result = verifyJwt(authorization);
 
   if (!result.ok) {
