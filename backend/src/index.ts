@@ -49,7 +49,7 @@ app.get('/api/localai/models', { preHandler: authMiddleware }, async (request, r
   const result = await client.request('/v1/models');
 
   if (!result.ok) {
-    const status = result.status > 0 ? result.status : 502;
+    const status = result.status === 401 ? 502 : result.status > 0 ? result.status : 502;
     return reply.status(status).send({
       error: result.error,
       upstreamStatus: result.status,
@@ -72,7 +72,7 @@ app.post('/api/localai/chat', { schema: { body: chatCompletionSchema }, preHandl
   });
 
   if (!result.ok) {
-    const status = result.status > 0 ? result.status : 502;
+    const status = result.status === 401 ? 502 : result.status > 0 ? result.status : 502;
     return reply.status(status).send({
       error: result.error,
       upstreamStatus: result.status,
@@ -91,7 +91,7 @@ app.delete('/api/localai/models/:id', { schema: { params: deleteModelParamsSchem
   });
 
   if (!result.ok) {
-    const status = result.status > 0 ? result.status : 502;
+    const status = result.status === 401 ? 502 : result.status > 0 ? result.status : 502;
     return reply.status(status).send({
       error: result.error,
       upstreamStatus: result.status,
