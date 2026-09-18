@@ -12,6 +12,9 @@ import {
   Loader2,
   MessageSquare,
   PlugZap,
+  Key,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -21,6 +24,8 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from "@radix-ui/react-alert-dialog";
+import { useAuthStore } from "../lib/auth";
+import { fetchModels, sendChat, deleteModel, checkHealth } from "../lib/api";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -31,60 +36,9 @@ interface ModelItem {
   [key: string]: unknown;
 }
 
-interface ModelsResponse {
-  data: ModelItem[];
-  object?: string;
-}
-
 interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
-}
-
-interface ChatResponse {
-  choices?: Array<{ message?: ChatMessage }>;
-  error?: { message?: string };
-  [key: string]: unknown;
-}
-
-// ─── API helpers ─────────────────────────────────────────────────────────────
-
-const API_BASE =
-  typeof process !== "undefined"
-    ? (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ?? "http://localhost:3001"
-    : "http://localhost:3001";
-
-async function fetchModels(): Promise<ModelItem[]> {
-  const res = await fetch(`${API_BASE}/api/localai/models`);
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-  const json = (await res.json()) as ModelsResponse;
-  return json.data ?? [];
-}
-
-async function sendChat(model: string, messages: ChatMessage[]): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/localai/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-  const json = (await res.json()) as ChatResponse;
-  const content = json.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Empty response from model");
-  return content;
-}
-
-async function deleteModel(modelId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/localai/models/${encodeURIComponent(modelId)}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -293,6 +247,79 @@ function ChatPanel({
   );
 }
 
+// ─── Token input component ───────────────────────────────────────────────────
+
+function TokenInput({
+  onAuthChange,
+}: {
+  onAuthChange: (authenticated: boolean) => void;
+}) {
+  const [tokenInput, setTokenInput] = useState("");
+  const [showToken, setShowToken] = useState(false);
+  const { token, setToken, clearToken, maskedToken } = useAuthStore();
+
+  const handleSetToken = () => {
+    const trimmed = tokenInput.trim();
+    if (trimmed) {
+      setToken(trimmed);
+      onAuthChange(true);
+    }
+  };
+
+  const handleLogout = () => {
+    clearToken();
+    setTokenInput("");
+    onAuthChange(false);
+  };
+
+  if (!token) {
+    return (
+      <div className="flex items-center gap-2">
+        <Key className="h-4 w-4 text-muted-foreground" />
+        <input
+          type="password"
+          value={tokenInput}
+          onChange={(e) => setTokenInput(e.target.value)}
+          placeholder="Inserisci token JWT…"
+          className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/40 focus:border-primary w-48"
+        />
+        <button
+          onClick={handleSetToken}
+          disabled={!tokenInput.trim()}
+          className="h-8 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-1"
+        >
+          <LogIn className="h-3 w-3" />
+          <span className="sr-only sm:not-sr-only">Autentica</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Key className="h-4 w-4 text-primary" />
+      <span className="text-xs font-mono text-muted-foreground">
+        {showToken ? token : maskedToken()}
+      </span>
+      <button
+        onClick={() => setShowToken((v) => !v)}
+        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        aria-label={showToken ? "Nascondi token" : "Mostra token"}
+      >
+        {showToken ? "Nascondi" : "Mostra"}
+      </button>
+      <button
+        onClick={handleLogout}
+        className="h-8 rounded-md border border-input px-2 py-1 text-xs hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-1"
+        aria-label="Esci"
+      >
+        <LogOut className="h-3 w-3" />
+        <span className="sr-only sm:not-sr-only">Esci</span>
+      </button>
+    </div>
+  );
+}
+
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -303,10 +330,22 @@ export default function Home() {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useAuthStore();
+
+  const handleAuthError = (err: Error) => {
+    if (err.message.includes("Unauthorized")) {
+      setAuthError("Token non valido o scaduto. Inserisci un nuovo token.");
+    }
+  };
 
   const { data: models, isLoading, error, refetch } = useQuery({
     queryKey: ["models"],
     queryFn: fetchModels,
+    enabled: isAuthenticated,
+    retry: false,
   });
 
   const deleteMutation = useMutation({
@@ -320,7 +359,10 @@ export default function Home() {
       setDeleteTarget(null);
     },
     onError: (err: Error) => {
-      alert(`Errore nell'eliminazione: ${err.message}`);
+      handleAuthError(err);
+      if (!err.message.includes("Unauthorized")) {
+        alert(`Errore nell'eliminazione: ${err.message}`);
+      }
       setDeleteTarget(null);
     },
   });
@@ -353,25 +395,36 @@ export default function Home() {
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Errore sconosciuto";
-      setChatError(msg);
+      handleAuthError(err instanceof Error ? err : new Error(msg));
+      if (!msg.includes("Unauthorized")) {
+        setChatError(msg);
+      }
       setMessages((prev) => prev.filter((m) => m.content !== prevInput));
     } finally {
       setChatLoading(false);
     }
   };
 
+  // Check health on mount (public endpoint)
+  useEffect(() => {
+    checkHealth().catch(() => {});
+  }, []);
+
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
       <header className="border-b px-6 py-3 flex items-center justify-between bg-background sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <PlugZap className="h-5 w-5 text-primary" />
-          <h1 className="text-base font-semibold tracking-tight">Cluster Hub</h1>
-          <span className="text-xs text-muted-foreground hidden sm:inline">LocalAI POC</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <PlugZap className="h-5 w-5 text-primary" />
+            <h1 className="text-base font-semibold tracking-tight">Cluster Hub</h1>
+            <span className="text-xs text-muted-foreground hidden sm:inline">LocalAI POC</span>
+          </div>
+          <TokenInput onAuthChange={setIsAuthenticated} />
         </div>
         <button
           onClick={() => refetch()}
-          disabled={isLoading}
+          disabled={isLoading || !isAuthenticated}
           className="rounded-md border border-input px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-1.5 disabled:opacity-50"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
@@ -379,19 +432,32 @@ export default function Home() {
         </button>
       </header>
 
+      {/* Auth error banner */}
+      {authError && (
+        <div className="mx-4 mt-2 flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <span>{authError}</span>
+        </div>
+      )}
+
       {/* Main */}
       <div className="flex flex-1 overflow-hidden">
         {/* Models panel */}
         <aside className="w-full sm:w-80 md:w-96 border-r flex flex-col overflow-hidden">
           <div className="px-4 py-3 border-b">
             <h2 className="text-sm font-medium">Modelli</h2>
+            {!isAuthenticated && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Inserisci il token JWT per continuare
+              </p>
+            )}
             {isLoading && (
               <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Caricamento…
               </p>
             )}
-            {error && (
+            {error && !authError && (
               <p className="text-xs text-destructive mt-1 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
                 {error instanceof Error ? error.message : String(error)}
@@ -399,7 +465,12 @@ export default function Home() {
             )}
           </div>
           <div className="flex-1 overflow-y-auto p-3">
-            {isLoading ? (
+            {!isAuthenticated ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+                <Key className="h-8 w-8 opacity-50" />
+                <p className="text-sm text-center">Autenticati per vedere i modelli</p>
+              </div>
+            ) : isLoading ? (
               <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
                 <Loader2 className="h-6 w-6 animate-spin opacity-50" />
                 <p className="text-sm">Caricamento modelli…</p>
@@ -417,7 +488,7 @@ export default function Home() {
               </div>
             ) : (
               <ModelList
-                models={models ?? []}
+                models={(models as ModelItem[]) ?? []}
                 selectedId={selectedId}
                 onSelect={handleSelect}
                 onDelete={handleDelete}
