@@ -2,8 +2,8 @@ import { useAuthStore } from './auth';
 
 const API_BASE =
   typeof process !== 'undefined'
-    ? (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ?? 'http://localhost:3001'
-    : 'http://localhost:3001';
+    ? (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ?? ''
+    : '';
 
 /**
  * Centralized API client that attaches Authorization Bearer from React state.

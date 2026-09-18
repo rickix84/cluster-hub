@@ -29,7 +29,7 @@ describe('api client', () => {
       await apiFetch('/api/localai/models');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3001/api/localai/models',
+        '/api/localai/models',
         expect.objectContaining({
           headers: expect.any(Headers),
         }),
@@ -127,7 +127,7 @@ describe('api client', () => {
       expect(reply).toBe('Hello!');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3001/api/localai/chat',
+        '/api/localai/chat',
         expect.objectContaining({
           method: 'POST',
           headers: expect.any(Headers),
@@ -160,7 +160,7 @@ describe('api client', () => {
 
       await deleteModel('model-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3001/api/localai/models/model-1',
+        '/api/localai/models/model-1',
         expect.objectContaining({ method: 'DELETE' }),
       );
     });
@@ -177,7 +177,7 @@ describe('api client', () => {
       const health = await checkHealth();
       expect(health.status).toBe('ok');
       // checkHealth calls fetch with no options (no headers)
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3001/api/health');
+      expect(mockFetch).toHaveBeenCalledWith('/api/health');
     });
   });
 });
