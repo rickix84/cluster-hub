@@ -1,5 +1,6 @@
 export interface LocalAIOptions {
   baseUrl: string;
+  apiKey?: string;
   timeoutMs?: number;
 }
 
@@ -13,10 +14,12 @@ export interface LocalAIResponse<T = unknown> {
 
 export class LocalAIClient {
   private readonly baseUrl: string;
+  private readonly apiKey: string | undefined;
   private readonly timeoutMs: number;
 
   constructor(options: LocalAIOptions) {
     this.baseUrl = options.baseUrl;
+    this.apiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs ?? 30000;
   }
 
@@ -39,6 +42,7 @@ export class LocalAIClient {
         signal,
         headers: {
           'Content-Type': 'application/json',
+          ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
           ...options.headers,
         },
       });

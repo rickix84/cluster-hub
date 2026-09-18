@@ -5,6 +5,7 @@ import { verifyJwt } from './jwt-verifier.js';
 import { chatCompletionSchema, deleteModelParamsSchema } from './schemas.js';
 
 const LOCALAI_BASE_URL = process.env.LOCALAI_BASE_URL || 'https://localai.tail6518ad.ts.net';
+const LOCALAI_API_KEY = process.env.LOCALAI_API_KEY;
 const LOCALAI_TIMEOUT_MS = parseInt(process.env.LOCALAI_TIMEOUT_MS || '30000', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
@@ -14,6 +15,7 @@ app.register(cors, { origin: CORS_ORIGIN });
 
 const client = new LocalAIClient({
   baseUrl: LOCALAI_BASE_URL,
+  apiKey: LOCALAI_API_KEY,
   timeoutMs: LOCALAI_TIMEOUT_MS,
 });
 
