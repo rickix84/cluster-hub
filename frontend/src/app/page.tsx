@@ -260,7 +260,11 @@ function TokenInput({
 
   const handleSetToken = (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
-    const trimmed = tokenInput.trim();
+    const trimmed = tokenInput
+      .trim()
+      .replace(/^Bearer\s+/i, "")
+      .replace(/^['"`]|['"`]$/g, "")
+      .trim();
     if (trimmed) {
       setToken(trimmed);
       onAuthChange(true);
@@ -283,7 +287,7 @@ function TokenInput({
           onChange={(e) => setTokenInput(e.target.value)}
           onPaste={(e) => setTokenInput(e.clipboardData.getData("text"))}
           placeholder="Inserisci token JWT…"
-          aria-label="Token JWT"
+          aria-label="Token JWT (con o senza prefisso Bearer)"
           className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/40 focus:border-primary w-48"
         />
         <button
